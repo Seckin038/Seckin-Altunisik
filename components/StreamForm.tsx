@@ -74,11 +74,11 @@ export const StreamForm: React.FC<StreamFormProps> = ({ subscription, settings, 
                 <InputField label="Apparaatsleutel" name="app_code" value={formState.app_code || ''} onChange={handleChange} />
                 <div className="md:col-span-2">
                     <InputField label="M3U Link" name="m3u_url" value={formState.m3u_url || ''} onChange={handleChange} />
-                     {m3uData && (
+                     {formState.m3u_url && (
                         <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-700/50 rounded-lg text-xs space-y-1 font-mono">
-                            <p><span className="font-semibold text-gray-500">Username:</span> {m3uData.username || 'N/A'}</p>
-                            <p><span className="font-semibold text-gray-500">Password:</span> {m3uData.password || 'N/A'}</p>
-                            <p><span className="font-semibold text-gray-500">Host/URL:</span> {m3uData.host || 'N/A'}</p>
+                            <p><span className="font-semibold text-gray-500">Username:</span> {m3uData?.username || 'N/A'}</p>
+                            <p><span className="font-semibold text-gray-500">Password:</span> {m3uData?.password || 'N/A'}</p>
+                            <p><span className="font-semibold text-gray-500">Host/URL:</span> {m3uData?.host || 'N/A'}</p>
                         </div>
                     )}
                 </div>

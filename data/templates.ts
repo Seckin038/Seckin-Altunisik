@@ -107,7 +107,9 @@ Bedankt voor je inzet! 🙌`
         message: `🎁 Beste {customer_name},
 
 Je ontvangt een cadeaucode: {gift_code}
-Gebruik: stuur deze code terug samen met je MAC en Apparaatsleutel. Dan activeer ik direct een gratis jaarabonnement.`
+Gebruik: stuur deze code terug samen met je MAC en Apparaatsleutel. Dan activeer ik direct een gratis jaarabonnement.
+
+Let op: {expiry_line}`
     },
 ];
 

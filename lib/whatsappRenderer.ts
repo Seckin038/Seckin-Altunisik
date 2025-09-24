@@ -105,10 +105,24 @@ export const renderWhatsappTemplate = (
     // Customer details
     rendered = rendered.replace(/{customer_name}/g, customer.name || 'klant');
     
+    // Handle gift code expiry line
+    if (extra?.expires_at) {
+        const expiryDate = new Date(parseInt(extra.expires_at, 10));
+        const expiry_datetime = formatNL(expiryDate.getTime());
+        const expiry_line = `de code verloopt op ${expiry_datetime}`;
+        rendered = rendered.replace(/{expiry_line}/g, expiry_line);
+    } else if (rendered.includes('{expiry_line}')) {
+        const expiry_line = 'deze code verloopt niet automatisch';
+        rendered = rendered.replace(/{expiry_line}/g, expiry_line);
+    }
+
     // Extra placeholders (for gift codes, milestones, etc.)
     if (extra) {
         Object.entries(extra).forEach(([key, value]) => {
-            rendered = rendered.replace(new RegExp(`{${key}}`, 'g'), value);
+            // Avoid re-processing expires_at
+            if (key !== 'expires_at') {
+                rendered = rendered.replace(new RegExp(`{${key}}`, 'g'), value);
+            }
         });
     }
 

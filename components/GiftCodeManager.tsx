@@ -48,16 +48,15 @@ const AddGiftCodeModal: React.FC<AddGiftCodeModalProps> = ({ onClose, customerId
 
             // Archive the message if a recipient is set
             if (newCode.receiver_id && templates && settings) {
-                const template = templates.find(t => t.name === 'G. Cadeaucode (handmatig)');
+                const template = templates.find(t => t.name === 'G. Cadeaucode');
                 const receiver = customers?.find(c => c.id === newCode.receiver_id);
                 if (template && receiver) {
-                    // FIX: Removed extra `undefined` argument to match function signature.
                     const messageToLog = renderWhatsappTemplate(
                         template.message,
                         receiver,
                         settings,
                         undefined,
-                        { gift_code: newCode.id }
+                        { gift_code: newCode.id, expires_at: String(newCode.expires_at) }
                     );
                     await logWhatsappMessage(receiver.id, messageToLog, template.name);
                 }
@@ -71,19 +70,18 @@ const AddGiftCodeModal: React.FC<AddGiftCodeModalProps> = ({ onClose, customerId
     const whatsAppMessage = useMemo(() => {
         if (!createdCode || !templates || !settings) return '';
         
-        const template = templates.find(t => t.name === 'G. Cadeaucode (handmatig)');
+        const template = templates.find(t => t.name === 'G. Cadeaucode');
         if (!template) return 'WhatsApp sjabloon voor cadeaucode niet gevonden.';
         
         const receiver = customers?.find(c => c.id === createdCode.receiver_id);
         const customerForTemplate = receiver ? { name: receiver.name } : { name: 'klant' };
         
-        // FIX: Removed extra `undefined` argument to match function signature.
         return renderWhatsappTemplate(
             template.message,
             customerForTemplate,
             settings,
             undefined, // no subscription context
-            { gift_code: createdCode.id }
+            { gift_code: createdCode.id, expires_at: String(createdCode.expires_at) }
         );
 
     }, [createdCode, customers, templates, settings]);
