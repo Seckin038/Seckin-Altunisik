@@ -1,0 +1,5 @@
+{
+  "name": "FLManager",
+  "description": "An offline-first PWA to manage IPTV customers, streams, subscriptions, payments, referrers, rewards, and WhatsApp communication for a single administrator.",
+  "requestFramePermissions": []
+}
