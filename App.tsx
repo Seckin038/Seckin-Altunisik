@@ -9,12 +9,13 @@ import { Dashboard } from './components/Dashboard';
 import { CustomerScreen } from './screens/CustomerScreen';
 import { RewardsScreen } from './screens/RewardsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { HistoryScreen } from './screens/HistoryScreen';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { PinLockScreen } from './components/PinLockScreen';
 import { PinSetupScreen } from './components/PinSetupScreen';
 
 
-export type View = 'DASHBOARD' | 'CUSTOMERS' | 'REWARDS' | 'SETTINGS';
+export type View = 'DASHBOARD' | 'CUSTOMERS' | 'REWARDS' | 'SETTINGS' | 'HISTORY';
 export type NavigationParams = { [key: string]: any };
 export type NavigationState = { view: View; params: NavigationParams };
 
@@ -93,6 +94,8 @@ const App: React.FC = () => {
                 return <RewardsScreen params={navState.params} onNavigate={handleNavigate} />;
             case 'SETTINGS':
                 return settings ? <SettingsScreen settings={settings} /> : <div>Laden...</div>;
+            case 'HISTORY':
+                return <HistoryScreen onNavigate={handleNavigate} />;
             default:
                 return <div>Pagina niet gevonden</div>;
         }

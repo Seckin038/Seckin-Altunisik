@@ -50,6 +50,7 @@ export const RewardClaimWizard: React.FC<RewardClaimWizardProps> = ({ customer, 
             await db.transaction('rw', db.subscriptions, db.timeline, async () => {
                 const sub = await db.subscriptions.get(selectedSubscriptionId);
                 if (!sub) throw new Error("Abonnement niet gevonden.");
+                const beforeState = { ...sub }; // Capture state before modification
 
                 const newEndDate = computeRenewalDate(sub.end_at, settings);
                 await db.subscriptions.update(selectedSubscriptionId, {
@@ -61,7 +62,7 @@ export const RewardClaimWizard: React.FC<RewardClaimWizardProps> = ({ customer, 
                     customer_id: customer.id,
                     type: 'REWARD_YEAR_APPLIED',
                     message: `Beloning voor mijlpaal ${milestone.milestone} toegepast: 1 jaar gratis voor stream ${sub.label}.`,
-                    meta: { milestone: milestone.milestone, subscriptionId: sub.id }
+                    meta: { milestone: milestone.milestone, subscriptionId: sub.id, before: beforeState }
                 });
             });
 
@@ -111,7 +112,7 @@ export const RewardClaimWizard: React.FC<RewardClaimWizardProps> = ({ customer, 
                 customer_id: customer.id,
                 type: 'REWARD_GIFT_CODE_GENERATED',
                 message: `Beloning voor mijlpaal ${milestone.milestone} geclaimd: cadeaucode ${newCode.id} gegenereerd.`,
-                meta: { milestone: milestone.milestone, giftCodeId: newCode.id }
+                meta: { milestone: milestone.milestone, giftCodeId: newCode.id, before: true }
             });
 
             // Generate and log WhatsApp message

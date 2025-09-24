@@ -3,16 +3,17 @@ import React from 'react';
 import type { Subscription, AppSettings } from '../types';
 import { getStatusInfo, formatNL, countriesToFlags } from '../lib/utils';
 // FIX: Corrected icon imports.
-import { CalendarIcon, CheckCircleIcon, CurrencyEuroIcon, GlobeAltIcon, HashtagIcon, PencilIcon, XCircleIcon } from './ui/Icons';
+import { CalendarIcon, CheckCircleIcon, CurrencyEuroIcon, GlobeAltIcon, HashtagIcon, PencilIcon, XCircleIcon, TrashIcon } from './ui/Icons';
 import { calculateSubscriptionPrice } from '../lib/price';
 
 interface StreamCardProps {
     subscription: Subscription;
     settings: AppSettings;
     onEdit: () => void;
+    onDelete: () => void;
 }
 
-export const StreamCard: React.FC<StreamCardProps> = ({ subscription, settings, onEdit }) => {
+export const StreamCard: React.FC<StreamCardProps> = ({ subscription, settings, onEdit, onDelete }) => {
     
     const statusInfo = getStatusInfo(subscription.status);
     const finalPrice = calculateSubscriptionPrice(subscription, settings);
@@ -45,6 +46,13 @@ export const StreamCard: React.FC<StreamCardProps> = ({ subscription, settings, 
                     <InfoItem icon={<GlobeAltIcon className="h-5 w-5 text-gray-400" />} label="Landen" value={countriesToFlags(subscription.countries)} />
                 </div>
                  <div className="pt-4 mt-4 border-t dark:border-gray-700 flex justify-end items-center space-x-2">
+                    <button 
+                        onClick={onDelete} 
+                        className="text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 p-2 rounded-lg flex items-center space-x-1"
+                    >
+                        <TrashIcon className="h-4 w-4"/>
+                        <span>Verwijder</span>
+                    </button>
                     <button 
                         onClick={onEdit} 
                         className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-brand-600 dark:hover:text-brand-500 p-2 rounded-lg flex items-center space-x-1"

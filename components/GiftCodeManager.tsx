@@ -2,15 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
 import { fmtDate, generateGiftCodeString } from '../lib/utils';
-// FIX: Corrected import path.
-import { addGiftCode } from '../lib/data-mutations';
+import { addGiftCode, deleteGiftCode } from '../lib/data-mutations';
 import { toast } from './ui/Toaster';
 import type { GiftCode, Customer, GiftCodeReason, WhatsappTemplate } from '../types';
-// FIX: Corrected icon imports.
-import { CopyIcon, PlusIcon } from './ui/Icons';
-// FIX: Corrected import path.
+import { CopyIcon, PlusIcon, TrashIcon } from './ui/Icons';
 import { renderWhatsappTemplate } from '../lib/whatsappRenderer';
 import { logWhatsappMessage } from '../lib/timeline';
+import { ConfirmationModal } from './ui/ConfirmationModal';
 
 const REASONS: GiftCodeReason[] = ['Promotie', 'Compensatie', 'Social', 'Wervingsbeloning', 'Anders'];
 
@@ -150,9 +148,18 @@ interface GiftCodeManagerProps {
 }
 
 export const GiftCodeManager: React.FC<GiftCodeManagerProps> = ({ customerId }) => {
-    const giftCodes = useLiveQuery(() => db.giftCodes.orderBy('created_at').reverse().toArray(), []);
+    const allGiftCodes = useLiveQuery(() => db.giftCodes.orderBy('created_at').reverse().toArray(), []);
     const customers = useLiveQuery(() => db.customers.toArray(), []);
     const [isAdding, setIsAdding] = useState(false);
+    const [codeToDelete, setCodeToDelete] = useState<GiftCode | null>(null);
+
+    const giftCodes = useMemo(() => {
+        if (!allGiftCodes) return [];
+        if (customerId) {
+            return allGiftCodes.filter(c => c.referrer_id === customerId || c.receiver_id === customerId);
+        }
+        return allGiftCodes;
+    }, [allGiftCodes, customerId]);
 
     const customersById = useMemo(() => {
         if (!customers) return {};
@@ -169,19 +176,32 @@ export const GiftCodeManager: React.FC<GiftCodeManagerProps> = ({ customerId }) 
         return { text: 'Open', color: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200' };
     };
 
+    const handleDelete = async () => {
+        if (!codeToDelete) return;
+        try {
+            await deleteGiftCode(codeToDelete.id);
+            toast.success(`Code ${codeToDelete.id} verwijderd.`);
+        } catch (error) {
+            toast.error("Kon code niet verwijderen.");
+        } finally {
+            setCodeToDelete(null);
+        }
+    };
+
     return (
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
             <div className="flex justify-between items-center mb-4">
-                 <h3 className="text-lg font-semibold">Cadeaucodes</h3>
+                 <h3 className="text-lg font-semibold">{customerId ? `Relevante Cadeaucodes` : 'Alle Cadeaucodes'}</h3>
                  <button onClick={() => setIsAdding(true)} className="bg-brand-600 text-white px-3 py-1.5 rounded-lg flex items-center space-x-2 hover:bg-brand-700">
                     <PlusIcon className="h-5 w-5" />
                     <span>Nieuwe Code</span>
                 </button>
             </div>
            
-            <div className="space-y-3 max-h-80 overflow-y-auto">
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
                 {giftCodes?.map(code => {
                     const status = getStatus(code);
+                    const canBeDeleted = !code.used_at;
                     return (
                         <div key={code.id} className="p-3 border rounded-lg dark:border-gray-700">
                             <div className="flex justify-between items-start">
@@ -191,6 +211,11 @@ export const GiftCodeManager: React.FC<GiftCodeManagerProps> = ({ customerId }) 
                                         <button onClick={() => navigator.clipboard.writeText(code.id)} className="text-gray-400 hover:text-gray-600">
                                             <CopyIcon className="h-4 w-4" />
                                         </button>
+                                        {canBeDeleted && (
+                                             <button onClick={() => setCodeToDelete(code)} className="text-red-400 hover:text-red-600">
+                                                <TrashIcon className="h-4 w-4" />
+                                            </button>
+                                        )}
                                     </div>
                                     <p className="text-xs text-gray-500">{code.reason} {code.note ? `- ${code.note}` : ''}</p>
                                </div>
@@ -208,10 +233,20 @@ export const GiftCodeManager: React.FC<GiftCodeManagerProps> = ({ customerId }) 
                     );
                 })}
                 {(!giftCodes || giftCodes.length === 0) && (
-                    <p className="text-center text-gray-500 dark:text-gray-400 py-4">Geen cadeaucodes gevonden.</p>
+                    <p className="text-center text-gray-500 dark:text-gray-400 py-4">
+                        {customerId ? 'Geen relevante codes voor deze klant.' : 'Geen cadeaucodes gevonden.'}
+                    </p>
                 )}
             </div>
             {isAdding && <AddGiftCodeModal onClose={() => setIsAdding(false)} customerId={customerId} />}
+
+            <ConfirmationModal 
+                isOpen={!!codeToDelete}
+                onClose={() => setCodeToDelete(null)}
+                onConfirm={handleDelete}
+                title="Cadeaucode Verwijderen"
+                message={`Weet je zeker dat je de code ${codeToDelete?.id} wilt verwijderen? Dit kan hersteld worden vanuit de geschiedenis.`}
+            />
         </div>
     );
 };

@@ -1,4 +1,3 @@
-
 export type SubscriptionStatus = 'ACTIVE' | 'TEST' | 'EXPIRED' | 'BLOCKED';
 export type PaymentMethod = 'Tikkie' | 'Contant' | 'Gratis' | 'Vrienden prijs';
 export type GiftCodeReason = 'Promotie' | 'Compensatie' | 'Social' | 'Wervingsbeloning' | 'Anders';
@@ -61,7 +60,7 @@ export interface CountryTemplate {
     countryCodes: string[];
 }
 
-export type TimelineEventType = 'CUSTOMER_CREATED' | 'SUBSCRIPTION_CREATED' | 'SUBSCRIPTION_RENEWED' | 'SUBSCRIPTION_MODIFIED' | 'SUBSCRIPTION_DELETED' | 'SUBSCRIPTION_STATUS_CHANGED' | 'REWARD_YEAR_APPLIED' | 'REWARD_GIFT_CODE_GENERATED' | 'NOTE_ADDED';
+export type TimelineEventType = 'CUSTOMER_CREATED' | 'CUSTOMER_DELETED' | 'SUBSCRIPTION_CREATED' | 'SUBSCRIPTION_RENEWED' | 'SUBSCRIPTION_MODIFIED' | 'SUBSCRIPTION_DELETED' | 'SUBSCRIPTION_STATUS_CHANGED' | 'REWARD_YEAR_APPLIED' | 'REWARD_GIFT_CODE_GENERATED' | 'NOTE_ADDED' | 'ACTION_REVERTED' | 'GIFT_CODE_CREATED' | 'GIFT_CODE_DELETED' | 'PAYMENT_ADDED' | 'WHATSAPP_SENT';
 
 export interface TimelineEvent {
     id: string;

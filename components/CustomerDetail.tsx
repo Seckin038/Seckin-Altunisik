@@ -4,21 +4,63 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
 import type { Customer, Subscription, AppSettings } from '../types';
 import type { View, NavigationParams } from '../App';
-// FIX: Corrected icon imports.
-import { ArrowLeftIcon, PencilIcon } from './ui/Icons';
-// FIX: Corrected import path for StreamForm.
+import { ArrowLeftIcon, PencilIcon, TrashIcon } from './ui/Icons';
 import { StreamForm } from './StreamForm';
 import { toast } from './ui/Toaster';
-// FIX: Corrected import path for data-mutations.
-import { saveSubscription, updateCustomer } from '../lib/data-mutations';
+import { saveSubscription, updateCustomer, deleteSubscription, deleteCustomer } from '../lib/data-mutations';
 import { TimelineTab } from './TimelineTab';
 import { RewardsTab } from './RewardsTab';
 import { WhatsappComposer } from './WhatsAppComposer';
 import { WhatsappArchiveTab } from './WhatsappArchiveTab';
-// FIX: Corrected import path for PaymentsTab.
 import { PaymentsTab } from './PaymentsTab';
-// FIX: Import StreamCard component to resolve 'Cannot find name' error.
 import { StreamCard } from './StreamCard';
+import { ConfirmationModal } from './ui/ConfirmationModal';
+
+
+interface DeleteCustomerModalProps {
+    customerName: string;
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+}
+const DeleteCustomerModal: React.FC<DeleteCustomerModalProps> = ({ customerName, isOpen, onClose, onConfirm }) => {
+    const [confirmationText, setConfirmationText] = useState('');
+
+    if (!isOpen) return null;
+
+    const isMatch = confirmationText === customerName;
+
+    return (
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-lg">
+                <h2 className="text-xl font-bold text-red-700 dark:text-red-300">Klant Verwijderen</h2>
+                <p className="text-gray-600 dark:text-gray-300 my-4">
+                    Dit is een zeer gevaarlijke actie. U staat op het punt om <strong>{customerName}</strong> permanent te verwijderen. Dit wist de klant, al hun streams, betalingen, wervingen, en geschiedenis.
+                </p>
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                    Om te bevestigen, typ de naam van de klant hieronder:
+                </p>
+                <input 
+                    type="text"
+                    value={confirmationText}
+                    onChange={(e) => setConfirmationText(e.target.value)}
+                    className="w-full p-2 border rounded-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600 mb-6"
+                />
+                <div className="flex justify-end space-x-2">
+                    <button onClick={onClose} className="bg-gray-200 dark:bg-gray-600 px-4 py-2 rounded-lg">Annuleren</button>
+                    <button 
+                        onClick={onConfirm}
+                        disabled={!isMatch}
+                        className="bg-red-600 text-white px-4 py-2 rounded-lg disabled:bg-red-300 disabled:cursor-not-allowed"
+                    >
+                        Ik begrijp de gevolgen, verwijder deze klant
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 interface CustomerDetailProps {
     customer: Customer;
@@ -34,6 +76,8 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, onBack
     const [isEditingCustomer, setIsEditingCustomer] = useState(false);
     const [customerForm, setCustomerForm] = useState(customer);
     const [activeTab, setActiveTab] = useState<Tab>((params.tab as Tab) || 'streams');
+    const [streamToDelete, setStreamToDelete] = useState<Subscription | null>(null);
+    const [isDeleteCustomerModalOpen, setIsDeleteCustomerModalOpen] = useState(false);
 
     const subscriptions = useLiveQuery(() => db.subscriptions.where('customer_id').equals(customer.id).toArray(), [customer.id]);
     const settings = useLiveQuery(() => db.settings.get('app'));
@@ -61,6 +105,29 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, onBack
             toast.error("Kon klant niet opslaan.");
         }
     };
+    
+    const handleDeleteStream = async () => {
+        if (!streamToDelete) return;
+        try {
+            await deleteSubscription(streamToDelete.id);
+            toast.success(`Stream '${streamToDelete.label}' verwijderd.`);
+        } catch (error) {
+            toast.error("Kon stream niet verwijderen.");
+        } finally {
+            setStreamToDelete(null);
+        }
+    };
+
+    const handleDeleteCustomer = async () => {
+        try {
+            await deleteCustomer(customer.id);
+            toast.success(`Klant ${customer.name} en alle data zijn verwijderd.`);
+            setIsDeleteCustomerModalOpen(false);
+            onBack();
+        } catch (error) {
+            toast.error("Kon klant niet verwijderen.");
+        }
+    }
     
     const TabButton: React.FC<{ tab: Tab, label: string }> = ({ tab, label }) => (
         <button
@@ -91,12 +158,15 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, onBack
                         </div>
                     </div>
                 ) : (
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start">
                         <div>
                             <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{customer.name}</h1>
                             <p className="text-gray-500">{customer.phone}</p>
                         </div>
-                        <button onClick={() => setIsEditingCustomer(true)} className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><PencilIcon className="h-5 w-5"/></button>
+                        <div className="flex space-x-2">
+                             <button onClick={() => setIsEditingCustomer(true)} className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"><PencilIcon className="h-5 w-5"/></button>
+                             <button onClick={() => setIsDeleteCustomerModalOpen(true)} className="p-2 rounded-lg text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50"><TrashIcon className="h-5 w-5"/></button>
+                        </div>
                     </div>
                 )}
             </div>
@@ -120,7 +190,7 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, onBack
                     ) : (
                         <div className="space-y-4">
                             {subscriptions?.map(sub => (
-                                <StreamCard key={sub.id} subscription={sub} settings={settings} onEdit={() => setEditingStream(sub)} />
+                                <StreamCard key={sub.id} subscription={sub} settings={settings} onEdit={() => setEditingStream(sub)} onDelete={() => setStreamToDelete(sub)} />
                             ))}
                             <button onClick={() => setEditingStream({})} className="w-full p-4 border-2 border-dashed rounded-lg text-center hover:bg-gray-50 dark:hover:bg-gray-800/50">
                                 + Nieuwe Stream Toevoegen
@@ -134,6 +204,21 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, onBack
                 {activeTab === 'archive' && <WhatsappArchiveTab customerId={customer.id} />}
                 {activeTab === 'payments' && <PaymentsTab customerId={customer.id} subscriptions={subscriptions || []} settings={settings} />}
             </div>
+
+            <ConfirmationModal
+                isOpen={!!streamToDelete}
+                onClose={() => setStreamToDelete(null)}
+                onConfirm={handleDeleteStream}
+                title="Stream Verwijderen"
+                message={`Weet je zeker dat je de stream '${streamToDelete?.label}' wilt verwijderen? Deze actie kan hersteld worden vanuit de geschiedenis.`}
+            />
+
+            <DeleteCustomerModal 
+                isOpen={isDeleteCustomerModalOpen}
+                onClose={() => setIsDeleteCustomerModalOpen(false)}
+                onConfirm={handleDeleteCustomer}
+                customerName={customer.name}
+            />
         </div>
     );
 };

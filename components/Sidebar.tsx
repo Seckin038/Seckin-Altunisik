@@ -1,6 +1,6 @@
 import React from 'react';
 import type { View, NavigationState, NavigationParams } from '../App';
-import { HomeIcon, UsersIcon, GiftIcon, CogIcon, XMarkIcon } from './ui/Icons';
+import { HomeIcon, UsersIcon, GiftIcon, CogIcon, XMarkIcon, QueueListIcon } from './ui/Icons';
 import { classNames } from '../lib/utils';
 
 interface SidebarProps {
@@ -85,6 +85,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, navState, onN
                             icon={<UsersIcon className="h-6 w-6" />}
                             currentView={navState.view}
                             onClick={() => handleNavigate('CUSTOMERS')}
+                        />
+                         <NavItem
+                            view="HISTORY"
+                            label="Geschiedenis"
+                            icon={<QueueListIcon className="h-6 w-6" />}
+                            currentView={navState.view}
+                            onClick={() => handleNavigate('HISTORY')}
                         />
                         <NavItem
                             view="REWARDS"

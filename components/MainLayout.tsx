@@ -18,6 +18,7 @@ const VIEW_TITLES: Record<View, string> = {
     CUSTOMERS: 'Klantenbeheer',
     REWARDS: 'Werving & Beloningen',
     SETTINGS: 'Instellingen',
+    HISTORY: 'Geschiedenis'
 };
 
 export const MainLayout: React.FC<MainLayoutProps> = ({

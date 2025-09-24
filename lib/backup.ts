@@ -1,18 +1,19 @@
 import { getSupabaseClient } from './supabase';
 import { db } from './db';
-import type { Customer, Subscription, TimelineEvent, CountryTemplate, WhatsappTemplate, GiftCode } from '../types';
+import type { Customer, Subscription, TimelineEvent, CountryTemplate, WhatsappTemplate, GiftCode, WhatsappLog, Payment } from '../types';
 
-const TABLES_TO_SYNC = [
+const USER_TABLES = [
     'customers',
     'subscriptions',
     'timeline',
     'countryTemplates',
     'whatsappTemplates',
     'giftCodes',
-    'whatsappLogs'
+    'whatsappLogs',
+    'payments'
 ] as const;
 
-type TableName = (typeof TABLES_TO_SYNC)[number];
+type TableName = (typeof USER_TABLES)[number];
 
 type TableTypeMap = {
     customers: Customer;
@@ -21,15 +22,15 @@ type TableTypeMap = {
     countryTemplates: CountryTemplate;
     whatsappTemplates: WhatsappTemplate;
     giftCodes: GiftCode;
-    whatsappLogs: any; // Use any for simplicity
+    whatsappLogs: WhatsappLog;
+    payments: Payment;
 };
 
 export const fullSync = async () => {
     const supabase = await getSupabaseClient();
-    const CHUNK_SIZE = 100; // Process records in smaller batches for reliability
+    const CHUNK_SIZE = 100;
 
-    // 1. PUSH local changes to Supabase in chunks
-    for (const table of TABLES_TO_SYNC) {
+    for (const table of USER_TABLES) {
         const localData = await db.table(table).toArray();
         if (localData.length === 0) continue;
 
@@ -39,14 +40,13 @@ export const fullSync = async () => {
             if (error) {
                 console.error(`Error pushing chunk for ${table}:`, error);
                 const errorMessage = `${error.message}${error.details ? ` (${error.details})` : ''}`;
-                console.error('Failing chunk data:', chunk); // Log the problematic data
+                console.error('Failing chunk data:', chunk);
                 throw new Error(`Synchronisatie mislukt voor ${table} (deel ${i / CHUNK_SIZE + 1}): ${errorMessage}`);
             }
         }
     }
 
-    // 2. PULL remote changes from Supabase
-    for (const table of TABLES_TO_SYNC) {
+    for (const table of USER_TABLES) {
         const { data, error } = await supabase.from(table).select();
         
         if (error) {
@@ -66,8 +66,7 @@ export const restoreFromCloud = async () => {
     const supabase = await getSupabaseClient();
 
     await db.transaction('rw', db.tables, async () => {
-        for (const table of TABLES_TO_SYNC) {
-            // 1. Pull all data from Supabase for the current table
+        for (const table of USER_TABLES) {
             const { data, error } = await supabase.from(table).select('*');
             if (error) {
                 console.error(`Error pulling ${table} for restore:`, error);
@@ -75,16 +74,51 @@ export const restoreFromCloud = async () => {
                 throw new Error(`Herstel mislukt bij ophalen van ${table}: ${errorMessage}`);
             }
 
-            // 2. Clear the corresponding local table
             await db.table(table).clear();
 
-            // 3. Populate the local table with the data from the cloud
             if (data && data.length > 0) {
                 await db.table(table).bulkPut(data);
             }
         }
     });
 
-    // After successfully restoring, update the last sync time
     await db.settings.update('app', { last_sync: Date.now() });
+};
+
+/**
+ * Exports all user-related data from Dexie to a JSON file.
+ */
+export const exportLocalData = async (): Promise<void> => {
+    const exportData: { [key: string]: any[] } = {};
+    for (const tableName of USER_TABLES) {
+        exportData[tableName] = await db.table(tableName).toArray();
+    }
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const date = new Date().toISOString().slice(0, 10);
+    a.download = `flmanager_backup_${date}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};
+
+/**
+ * Imports data from a JSON file into Dexie, overwriting existing data.
+ */
+export const importLocalData = async (file: File): Promise<void> => {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    await db.transaction('rw', ...USER_TABLES, async () => {
+        for (const tableName of USER_TABLES) {
+            if (data[tableName]) {
+                await db.table(tableName).clear();
+                await db.table(tableName).bulkPut(data[tableName]);
+            }
+        }
+    });
 };

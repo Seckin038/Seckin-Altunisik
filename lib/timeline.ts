@@ -1,6 +1,3 @@
-
-
-
 import { db } from './db';
 import { generateId } from './utils';
 // FIX: Corrected import paths.
@@ -24,14 +21,23 @@ export const logWhatsappMessage = async (
     templateName?: string
 ): Promise<void> => {
     try {
-        const logEntry: WhatsappLog = {
-            id: generateId(),
-            customer_id: customerId,
-            timestamp: Date.now(),
-            message,
-            template_name: templateName,
-        };
-        await db.whatsappLogs.add(logEntry);
+        await db.transaction('rw', db.whatsappLogs, db.timeline, async () => {
+            const logEntry: WhatsappLog = {
+                id: generateId(),
+                customer_id: customerId,
+                timestamp: Date.now(),
+                message,
+                template_name: templateName,
+            };
+            await db.whatsappLogs.add(logEntry);
+
+            await logTimelineEvent({
+                customer_id: customerId,
+                type: 'WHATSAPP_SENT',
+                message: `WhatsApp bericht gearchiveerd (${templateName || 'handmatig'}).`,
+                meta: { whatsappLogId: logEntry.id, before: true } // 'before: true' marks it as revertible (creation)
+            });
+        });
     } catch (error) {
         console.error("Failed to log WhatsApp message:", error);
         // Do not throw, logging is a non-critical background task.

@@ -57,7 +57,17 @@ export const CustomerList: React.FC<CustomerListProps> = ({ onSelectCustomer, on
 
         // Main status filter from dashboard click
         if (filters.status) {
-            items = items.filter(item => item.subscription.status === filters.status);
+            if (filters.status === 'EXPIRING_SOON') {
+                const now = Date.now();
+                const fourteenDaysFromNow = now + 14 * 24 * 60 * 60 * 1000;
+                items = items.filter(item => 
+                    item.subscription.status === 'ACTIVE' &&
+                    item.subscription.end_at > now &&
+                    item.subscription.end_at <= fourteenDaysFromNow
+                );
+            } else {
+                items = items.filter(item => item.subscription.status === filters.status);
+            }
         }
         
         // Search term filter
@@ -116,7 +126,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({ onSelectCustomer, on
 
     }, [customers, subscriptions, filters, searchTerm, advFilters, sort, referralCounts]);
 
-    const activeFilterText = filters.status ? `Status: ${filters.status}` : (filters.view === 'customers' ? 'Alle Klanten' : '');
+    const activeFilterText = filters.status === 'EXPIRING_SOON' ? 'Verloopt Binnen 14 Dagen' : (filters.status ? `Status: ${filters.status}` : '');
 
     const handleAdvFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setAdvFilters(f => ({ ...f, [e.target.name]: e.target.value }));

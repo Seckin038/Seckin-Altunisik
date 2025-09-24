@@ -5,14 +5,15 @@ import { toast } from '../components/ui/Toaster';
 import { CountryTemplatesSettings } from '../components/CountryTemplatesSettings';
 import { WhatsappTemplatesSettings } from '../components/WhatsappTemplatesSettings';
 import { SyncModal } from '../components/SyncModal';
-import { fullSync, restoreFromCloud } from '../lib/backup';
+import { fullSync, restoreFromCloud, exportLocalData, importLocalData } from '../lib/backup';
 import { formatNL } from '../lib/utils';
 import type { AppSettings } from '../types';
-// FIX: Corrected import path.
 import { deleteAllUserData, deleteTestCustomers } from '../lib/data-mutations';
 import { MassDeleteModal } from '../components/MassDeleteModal';
 import { RestoreModal } from '../components/RestoreModal';
 import { DeleteTestCustomersModal } from '../components/DeleteTestCustomersModal';
+import { ExportModal } from '../components/ExportModal';
+import { ImportModal } from '../components/ImportModal';
 
 const InputField: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string }> = ({ label, ...props }) => (
     <div>
@@ -98,6 +99,8 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
     const [isMassDeleteOpen, setIsMassDeleteOpen] = useState(false);
     const [isRestoreOpen, setIsRestoreOpen] = useState(false);
     const [isDeleteTestOpen, setIsDeleteTestOpen] = useState(false);
+    const [isExportOpen, setIsExportOpen] = useState(false);
+    const [isImportOpen, setIsImportOpen] = useState(false);
     
     React.useEffect(() => {
         if (liveSettings) {
@@ -189,6 +192,38 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
             console.error(error);
         } finally {
             setIsDeleteTestOpen(false);
+        }
+    };
+    
+    const handleExport = async (pin: string) => {
+        if (pin !== liveSettings.pin) {
+            toast.error("Incorrecte pincode. Actie geannuleerd.");
+            return;
+        }
+        try {
+            await exportLocalData();
+            toast.success("Data succesvol geëxporteerd!");
+        } catch (error) {
+            toast.error("Kon data niet exporteren.");
+        } finally {
+            setIsExportOpen(false);
+        }
+    };
+    
+    const handleImport = async (pin: string, file: File) => {
+        if (pin !== liveSettings.pin) {
+            toast.error("Incorrecte pincode. Actie geannuleerd.");
+            return;
+        }
+        const toastId = toast.loading("Data importeren...", { duration: Infinity });
+        try {
+            await importLocalData(file);
+            toast.success("Data succesvol geïmporteerd! De app wordt opnieuw geladen.", { id: toastId, duration: 5000 });
+            setTimeout(() => window.location.reload(), 2000);
+        } catch (error) {
+            toast.error("Importeren mislukt. Zorg dat het een geldig back-up bestand is.", { id: toastId, duration: 5000 });
+        } finally {
+            setIsImportOpen(false);
         }
     };
 
@@ -290,6 +325,12 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
                     Gevaarlijke acties die data kunnen verwijderen of overschrijven. Ga voorzichtig te werk.
                  </p>
                  <div className="flex flex-wrap justify-end gap-2">
+                     <button onClick={() => setIsExportOpen(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                         Exporteer Lokale Data
+                     </button>
+                      <button onClick={() => setIsImportOpen(true)} className="bg-blue-800 text-white px-4 py-2 rounded-lg hover:bg-blue-900">
+                         Importeer Data Bestand
+                     </button>
                      <button onClick={() => setIsDeleteTestOpen(true)} className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600">
                          Verwijder Testklanten
                      </button>
@@ -307,6 +348,8 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
             <MassDeleteModal isOpen={isMassDeleteOpen} onClose={() => setIsMassDeleteOpen(false)} onConfirm={handleMassDelete} />
             <RestoreModal isOpen={isRestoreOpen} onClose={() => setIsRestoreOpen(false)} onConfirm={handleRestore} />
             <DeleteTestCustomersModal isOpen={isDeleteTestOpen} onClose={() => setIsDeleteTestOpen(false)} onConfirm={handleDeleteTestCustomers} />
+            <ExportModal isOpen={isExportOpen} onClose={() => setIsExportOpen(false)} onConfirm={handleExport} />
+            <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onConfirm={handleImport} />
         </div>
     );
 };
