@@ -146,3 +146,17 @@ export const parseM3uUrl = (url: string | undefined): { username: string | null;
         return null;
     }
 };
+
+/**
+ * Constructs an M3U URL from its host, username, and password components.
+ * @param host The server host (e.g., my.server.com:8080).
+ * @param username The username for the stream.
+ * @param password The password for the stream.
+ * @returns The fully constructed M3U URL string.
+ */
+export const constructM3uUrl = (host: string, username: string, password: string): string => {
+    if (!host || !username || !password) return '';
+    // Strip protocol if user adds it to the host
+    const cleanHost = host.replace(/^(https?:\/\/)/, '');
+    return `http://${cleanHost}/get.php?username=${username}&password=${password}&type=m3u_plus&output=m3u8`;
+};

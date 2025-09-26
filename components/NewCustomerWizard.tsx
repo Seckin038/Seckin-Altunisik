@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
 // FIX: Corrected import path.
 import { addCustomer, saveSubscription } from '../lib/data-mutations';
-import { computeEndDate, formatNL } from '../lib/utils';
+import { computeEndDate, formatNL, parseM3uUrl } from '../lib/utils';
 import { CountrySelector } from './CountrySelector';
 import { toast } from './ui/Toaster';
 // FIX: Corrected import path.
@@ -76,7 +76,7 @@ const GiftCodeInput: React.FC<{
                     onChange={e => setGiftCodeInput(e.target.value.toUpperCase())}
                     className="w-full p-2 border rounded-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600"
                 />
-                <button onClick={handleValidate} className="bg-gray-200 dark:bg-gray-600 px-3 py-2 rounded-lg text-sm">Valideer</button>
+                <button type="button" onClick={handleValidate} className="bg-gray-200 dark:bg-gray-600 px-3 py-2 rounded-lg text-sm">Valideer</button>
             </div>
             {error && <p className="text-sm text-red-500">{error}</p>}
         </div>
@@ -129,6 +129,7 @@ const WhatsappPreview: React.FC<{ customer: Partial<Customer>, stream: Partial<S
                 className="w-full p-2 border rounded-md bg-gray-50 dark:bg-gray-900 dark:border-gray-700 font-mono text-xs"
             />
              <button 
+                type="button"
                 onClick={() => {
                     navigator.clipboard.writeText(message);
                     toast.success("Bericht gekopieerd!");
@@ -148,6 +149,7 @@ export const NewCustomerWizard: React.FC<NewCustomerWizardProps> = ({ onFinish, 
     const [streams, setStreams] = useState<Partial<Subscription>[]>([{ ...INITIAL_STREAM }]);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [validatedGiftCodes, setValidatedGiftCodes] = useState<Record<number, GiftCode>>({});
+    const [parsedM3uParts, setParsedM3uParts] = useState<Array<ReturnType<typeof parseM3uUrl>>>([null]);
 
     const settings = useLiveQuery(() => db.settings.get('app'));
     const customers = useLiveQuery(() => db.customers.toArray());
@@ -155,17 +157,40 @@ export const NewCustomerWizard: React.FC<NewCustomerWizardProps> = ({ onFinish, 
     const templates = useLiveQuery(() => db.whatsappTemplates.toArray());
     const countryTemplates = useLiveQuery(() => db.countryTemplates.toArray());
 
+    useEffect(() => {
+        const newParsedParts = streams.map(stream => parseM3uUrl(stream.m3u_url));
+        setParsedM3uParts(newParsedParts);
+    }, [streams]);
+
+
     const updateStream = (index: number, updatedStream: Partial<Subscription>) => {
         const newStreams = [...streams];
         newStreams[index] = updatedStream;
         setStreams(newStreams);
     };
 
-    const addStream = () => setStreams(s => [...s, { ...INITIAL_STREAM }]);
+    const addStream = () => {
+        setStreams(s => [...s, { ...INITIAL_STREAM }]);
+        setParsedM3uParts(p => [...p, null]);
+    };
+
     const removeStream = (index: number) => {
         setStreams(s => s.filter((_, i) => i !== index));
-        const newCodes = { ...validatedGiftCodes };
-        delete newCodes[index];
+        setParsedM3uParts(p => p.filter((_, i) => i !== index));
+
+        // FIX: Replaced problematic Object.entries loop with a type-safe for...of loop over Object.keys
+        // to correctly re-key the validatedGiftCodes record when a stream is removed. This resolves
+        // multiple TypeScript errors related to type inference.
+        const newCodes: Record<number, GiftCode> = {};
+        for (const key of Object.keys(validatedGiftCodes)) {
+            const numKey = parseInt(key, 10);
+            const value = validatedGiftCodes[numKey];
+            if (numKey < index) {
+                newCodes[numKey] = value;
+            } else if (numKey > index) {
+                newCodes[numKey - 1] = value;
+            }
+        }
         setValidatedGiftCodes(newCodes);
     };
 
@@ -280,10 +305,11 @@ export const NewCustomerWizard: React.FC<NewCustomerWizardProps> = ({ onFinish, 
             <h2 className="text-xl font-semibold">Stap 2: Stream & M3U</h2>
             {streams.map((stream, index) => {
                 const appliedCode = validatedGiftCodes[index];
+                const streamM3uParsed = parsedM3uParts[index];
                 return (
                     <div key={index} className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg space-y-4 relative">
                         {streams.length > 1 && (
-                            <button onClick={() => removeStream(index)} className="absolute top-2 right-2 text-red-500 hover:text-red-700">
+                            <button type="button" onClick={() => removeStream(index)} className="absolute top-2 right-2 text-red-500 hover:text-red-700">
                                <TrashIcon className="h-5 w-5"/>
                             </button>
                         )}
@@ -293,7 +319,23 @@ export const NewCustomerWizard: React.FC<NewCustomerWizardProps> = ({ onFinish, 
                             <p><strong>Startdatum (read-only):</strong> {formatNL(Date.now())}</p>
                             <p><strong>Einddatum (read-only):</strong> {formatNL(computeEndDate(Date.now(), 'TEST', settings || {} as any))}</p>
                         </div>
-                        <InputField label="M3U Link" name="m3u_url" value={stream.m3u_url || ''} onChange={(e) => updateStream(index, { ...stream, m3u_url: e.target.value })} required error={errors[`stream_${index}_m3u`]} />
+                        <InputField 
+                            label="M3U Link" 
+                            name="m3u_url" 
+                            value={stream.m3u_url || ''} 
+                            onChange={(e) => updateStream(index, { ...stream, m3u_url: e.target.value })} 
+                            placeholder="http://host:port/get.php?..." 
+                            required 
+                            error={errors[`stream_${index}_m3u`]} 
+                        />
+                        {streamM3uParsed && (
+                            <div className="space-y-2 p-3 bg-white dark:bg-gray-800 rounded-lg">
+                                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Xtream Codes (automatisch ingevuld)</h4>
+                                <InputField label="Host" name="host" value={streamM3uParsed.host || 'N/A'} readOnly />
+                                <InputField label="Username" name="username" value={streamM3uParsed.username || 'N/A'} readOnly />
+                                <InputField label="Password" name="password" value={streamM3uParsed.password || 'N/A'} readOnly />
+                            </div>
+                        )}
                         <InputField label="MAC Adres (optioneel)" name="mac" value={stream.mac || ''} onChange={(e) => updateStream(index, { ...stream, mac: e.target.value })} error={errors[`stream_${index}_mac`]} />
                         <InputField label="Apparaatsleutel (optioneel)" name="app_code" value={stream.app_code || ''} onChange={(e) => updateStream(index, { ...stream, app_code: e.target.value })} />
                         {errors[`stream_${index}`] && <p className="text-sm text-red-500">{errors[`stream_${index}`]}</p>}
@@ -305,7 +347,7 @@ export const NewCustomerWizard: React.FC<NewCustomerWizardProps> = ({ onFinish, 
                                         <CheckCircleIcon className="h-5 w-5 text-green-600"/>
                                         <p>Cadeaucode <strong>{appliedCode.id}</strong> toegepast.</p>
                                     </div>
-                                    <button onClick={() => {
+                                    <button type="button" onClick={() => {
                                         const { [index]: _, ...rest } = validatedGiftCodes;
                                         setValidatedGiftCodes(rest);
                                         updateStream(index, { ...stream, payment_method: 'Tikkie', paid: false, free: false });
@@ -330,7 +372,7 @@ export const NewCustomerWizard: React.FC<NewCustomerWizardProps> = ({ onFinish, 
                     </div>
                 );
             })}
-            <button onClick={addStream} className="text-brand-600 hover:text-brand-700 text-sm font-medium flex items-center space-x-1">
+            <button type="button" onClick={addStream} className="text-brand-600 hover:text-brand-700 text-sm font-medium flex items-center space-x-1">
                 <PlusIcon className="h-4 w-4"/>
                 <span>Stream toevoegen</span>
             </button>
@@ -363,12 +405,12 @@ export const NewCustomerWizard: React.FC<NewCustomerWizardProps> = ({ onFinish, 
                 
                 <div className="flex justify-between items-center pt-6 border-t dark:border-gray-600 mt-6">
                     <div>
-                        {step > 1 && <button onClick={() => setStep(s => s - 1)} className="bg-gray-200 dark:bg-gray-600 px-4 py-2 rounded-lg">Terug</button>}
+                        {step > 1 && <button type="button" onClick={() => setStep(s => s - 1)} className="bg-gray-200 dark:bg-gray-600 px-4 py-2 rounded-lg">Terug</button>}
                     </div>
                     <div className="flex space-x-2">
-                        <button onClick={onCancel} className="bg-gray-200 dark:bg-gray-600 px-4 py-2 rounded-lg">Annuleren</button>
-                        {step < 3 && <button onClick={() => (step === 1 ? validateStep1() && setStep(2) : validateStep2() && setStep(3))} className="bg-brand-600 text-white px-4 py-2 rounded-lg">Volgende</button>}
-                        {step === 3 && <button onClick={handleSave} className="bg-green-600 text-white px-4 py-2 rounded-lg">Alles Opslaan</button>}
+                        <button type="button" onClick={onCancel} className="bg-gray-200 dark:bg-gray-600 px-4 py-2 rounded-lg">Annuleren</button>
+                        {step < 3 && <button type="button" onClick={() => (step === 1 ? validateStep1() && setStep(2) : validateStep2() && setStep(3))} className="bg-brand-600 text-white px-4 py-2 rounded-lg">Volgende</button>}
+                        {step === 3 && <button type="button" onClick={handleSave} className="bg-green-600 text-white px-4 py-2 rounded-lg">Alles Opslaan</button>}
                     </div>
                 </div>
             </div>
@@ -379,7 +421,7 @@ export const NewCustomerWizard: React.FC<NewCustomerWizardProps> = ({ onFinish, 
 const InputField: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string, error?: string }> = ({ label, error, ...props }) => (
     <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
-        <input {...props} className={`mt-1 block w-full p-2 border rounded-md bg-gray-50 dark:bg-gray-700 ${error ? 'border-red-500' : 'dark:border-gray-600'}`} />
+        <input {...props} className={`mt-1 block w-full p-2 border rounded-md bg-gray-50 dark:bg-gray-700 ${error ? 'border-red-500' : 'dark:border-gray-600'} read-only:bg-gray-200 dark:read-only:bg-gray-800`} />
         {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
 );

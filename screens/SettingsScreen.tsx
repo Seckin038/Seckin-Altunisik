@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
@@ -5,15 +6,14 @@ import { toast } from '../components/ui/Toaster';
 import { CountryTemplatesSettings } from '../components/CountryTemplatesSettings';
 import { WhatsappTemplatesSettings } from '../components/WhatsappTemplatesSettings';
 import { SyncModal } from '../components/SyncModal';
-import { fullSync, restoreFromCloud, exportLocalData, importLocalData } from '../lib/backup';
+import { fullSync, restoreFromCloud } from '../lib/backup';
+import { exportToFile, importFromFile } from '../lib/file-backup'; // New import
 import { formatNL } from '../lib/utils';
 import type { AppSettings } from '../types';
 import { deleteAllUserData, deleteTestCustomers } from '../lib/data-mutations';
 import { MassDeleteModal } from '../components/MassDeleteModal';
 import { RestoreModal } from '../components/RestoreModal';
 import { DeleteTestCustomersModal } from '../components/DeleteTestCustomersModal';
-import { ExportModal } from '../components/ExportModal';
-import { ImportModal } from '../components/ImportModal';
 
 const InputField: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string }> = ({ label, ...props }) => (
     <div>
@@ -99,8 +99,6 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
     const [isMassDeleteOpen, setIsMassDeleteOpen] = useState(false);
     const [isRestoreOpen, setIsRestoreOpen] = useState(false);
     const [isDeleteTestOpen, setIsDeleteTestOpen] = useState(false);
-    const [isExportOpen, setIsExportOpen] = useState(false);
-    const [isImportOpen, setIsImportOpen] = useState(false);
     
     React.useEffect(() => {
         if (liveSettings) {
@@ -168,7 +166,7 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
             toast.success("Herstel voltooid! De app wordt opnieuw geladen.", { id: toastId, duration: 5000 });
             setTimeout(() => window.location.reload(), 2000);
         } catch (error: any) {
-            toast.error(`Herstel mislukt bij ophalen van ${error.message}: ${error.cause}`, { id: toastId, duration: 5000 });
+            toast.error(`Herstel mislukt. ${error.message}`, { id: toastId, duration: 5000 });
             console.error(error);
         } finally {
             setIsRestoreOpen(false);
@@ -194,36 +192,33 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
             setIsDeleteTestOpen(false);
         }
     };
-    
-    const handleExport = async (pin: string) => {
-        if (pin !== liveSettings.pin) {
-            toast.error("Incorrecte pincode. Actie geannuleerd.");
-            return;
-        }
+
+    const handleFileExport = async () => {
+        const toastId = toast.loading("Back-up maken...", { duration: Infinity });
         try {
-            await exportLocalData();
-            toast.success("Data succesvol geëxporteerd!");
-        } catch (error) {
-            toast.error("Kon data niet exporteren.");
-        } finally {
-            setIsExportOpen(false);
+            await exportToFile();
+            toast.success("Back-up bestand succesvol opgeslagen!", { id: toastId });
+        } catch (error: any) {
+            if (error.name !== 'AbortError') { // User cancelling is not an error
+                toast.error(`Exporteren mislukt: ${error.message}`, { id: toastId });
+            } else {
+                toast.dismiss(toastId);
+            }
         }
     };
-    
-    const handleImport = async (pin: string, file: File) => {
-        if (pin !== liveSettings.pin) {
-            toast.error("Incorrecte pincode. Actie geannuleerd.");
-            return;
-        }
+
+    const handleFileImport = async () => {
         const toastId = toast.loading("Data importeren...", { duration: Infinity });
         try {
-            await importLocalData(file);
+            await importFromFile();
             toast.success("Data succesvol geïmporteerd! De app wordt opnieuw geladen.", { id: toastId, duration: 5000 });
             setTimeout(() => window.location.reload(), 2000);
-        } catch (error) {
-            toast.error("Importeren mislukt. Zorg dat het een geldig back-up bestand is.", { id: toastId, duration: 5000 });
-        } finally {
-            setIsImportOpen(false);
+        } catch (error: any) {
+             if (error.name !== 'AbortError') {
+                toast.error(`Importeren mislukt: ${error.message}`, { id: toastId });
+            } else {
+                 toast.dismiss(toastId);
+            }
         }
     };
 
@@ -250,6 +245,19 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
     return (
         <div className="space-y-6">
             <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Instellingen</h1>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h2 className="text-xl font-semibold mb-4">Eenvoudige Back-up & Herstel</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Maak een handmatige back-up naar een .json-bestand op uw computer of in een cloudmap (zoals Google Drive). Ideaal voor snelle, losse back-ups.</p>
+                <div className="flex flex-wrap gap-2">
+                    <button onClick={handleFileExport} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                        Maak Back-up (.json)
+                    </button>
+                    <button onClick={handleFileImport} className="bg-blue-800 text-white px-4 py-2 rounded-lg hover:bg-blue-900">
+                        Herstel van Back-up (.json)
+                    </button>
+                </div>
+            </div>
 
              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <h2 className="text-xl font-semibold mb-4">Beveiliging</h2>
@@ -293,10 +301,11 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                 <h2 className="text-xl font-semibold mb-4">Cloud Synchronisatie</h2>
+                 <h2 className="text-xl font-semibold mb-2">Real-time Synchronisatie (voor meerdere apparaten)</h2>
+                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Gebruik Supabase om uw data automatisch te synchroniseren tussen bijvoorbeeld uw PC en mobiel.</p>
                 {areKeysMissing ? (
                     <div className="text-center p-4 border-2 border-dashed rounded-lg dark:border-gray-600">
-                        <p className="text-gray-500 dark:text-gray-400 mb-4">Cloud Synchronisatie is nog niet geconfigureerd.</p>
+                        <p className="text-gray-500 dark:text-gray-400 mb-4">Real-time synchronisatie is nog niet geconfigureerd.</p>
                         <button onClick={() => setIsSupabaseSetupOpen(true)} className="bg-brand-600 text-white px-4 py-2 rounded-lg">
                             Configureer Nu
                         </button>
@@ -325,17 +334,11 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
                     Gevaarlijke acties die data kunnen verwijderen of overschrijven. Ga voorzichtig te werk.
                  </p>
                  <div className="flex flex-wrap justify-end gap-2">
-                     <button onClick={() => setIsExportOpen(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-                         Exporteer Lokale Data
-                     </button>
-                      <button onClick={() => setIsImportOpen(true)} className="bg-blue-800 text-white px-4 py-2 rounded-lg hover:bg-blue-900">
-                         Importeer Data Bestand
-                     </button>
                      <button onClick={() => setIsDeleteTestOpen(true)} className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600">
                          Verwijder Testklanten
                      </button>
                      <button onClick={() => setIsRestoreOpen(true)} className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700">
-                         Herstel Vanaf Cloud
+                         Herstel Vanaf Cloud (Supabase)
                      </button>
                      <button onClick={() => setIsMassDeleteOpen(true)} className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
                          Verwijder Alle Data
@@ -348,8 +351,6 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
             <MassDeleteModal isOpen={isMassDeleteOpen} onClose={() => setIsMassDeleteOpen(false)} onConfirm={handleMassDelete} />
             <RestoreModal isOpen={isRestoreOpen} onClose={() => setIsRestoreOpen(false)} onConfirm={handleRestore} />
             <DeleteTestCustomersModal isOpen={isDeleteTestOpen} onClose={() => setIsDeleteTestOpen(false)} onConfirm={handleDeleteTestCustomers} />
-            <ExportModal isOpen={isExportOpen} onClose={() => setIsExportOpen(false)} onConfirm={handleExport} />
-            <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onConfirm={handleImport} />
         </div>
     );
 };

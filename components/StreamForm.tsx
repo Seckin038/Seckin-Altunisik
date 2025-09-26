@@ -15,15 +15,16 @@ const PAYMENT_METHODS: PaymentMethod[] = ['Tikkie', 'Contant', 'Gratis', 'Vriend
 const STATUSES: SubscriptionStatus[] = ['ACTIVE', 'TEST', 'EXPIRED', 'BLOCKED'];
 
 export const StreamForm: React.FC<StreamFormProps> = ({ subscription, settings, onSave, onCancel }) => {
-    const [formState, setFormState] = useState<Partial<Subscription>>({});
-    const [m3uData, setM3uData] = useState<{ username: string | null; password: string | null; host: string | null } | null>(null);
+    const [formState, setFormState] = useState<Partial<Subscription>>(subscription);
+    const [parsedM3u, setParsedM3u] = useState<{ host: string | null; username: string | null; password: string | null; } | null>(null);
 
     useEffect(() => {
         setFormState(subscription);
     }, [subscription]);
-
+    
     useEffect(() => {
-        setM3uData(parseM3uUrl(formState.m3u_url));
+        const parts = parseM3uUrl(formState.m3u_url);
+        setParsedM3u(parts);
     }, [formState.m3u_url]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -72,16 +73,27 @@ export const StreamForm: React.FC<StreamFormProps> = ({ subscription, settings, 
                 <InputField label="Einddatum" type="datetime-local" name="end_at" value={formatTimestampForInput(formState.end_at)} onChange={handleDateChange} />
                 <InputField label="MAC Adres" name="mac" value={formState.mac || ''} onChange={handleChange} />
                 <InputField label="Apparaatsleutel" name="app_code" value={formState.app_code || ''} onChange={handleChange} />
+                
                 <div className="md:col-span-2">
-                    <InputField label="M3U Link" name="m3u_url" value={formState.m3u_url || ''} onChange={handleChange} />
-                     {formState.m3u_url && (
-                        <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-700/50 rounded-lg text-xs space-y-1 font-mono">
-                            <p><span className="font-semibold text-gray-500">Username:</span> {m3uData?.username || 'N/A'}</p>
-                            <p><span className="font-semibold text-gray-500">Password:</span> {m3uData?.password || 'N/A'}</p>
-                            <p><span className="font-semibold text-gray-500">Host/URL:</span> {m3uData?.host || 'N/A'}</p>
-                        </div>
-                    )}
+                    <InputField 
+                        label="M3U Link" 
+                        name="m3u_url" 
+                        value={formState.m3u_url || ''} 
+                        onChange={handleChange} 
+                        placeholder="http://host:port/get.php?username=...&password=..." 
+                        required 
+                    />
                 </div>
+                
+                {parsedM3u && (
+                    <div className="md:col-span-2 space-y-2 p-3 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Xtream Codes (automatisch ingevuld)</h4>
+                        <InputField label="Host" name="host" value={parsedM3u.host || 'N/A'} readOnly />
+                        <InputField label="Username" name="username" value={parsedM3u.username || 'N/A'} readOnly />
+                        <InputField label="Password" name="password" value={parsedM3u.password || 'N/A'} readOnly />
+                    </div>
+                )}
+
                  <SelectField label="Betaalmethode" name="payment_method" value={formState.payment_method || ''} onChange={handleChange}>
                     {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                 </SelectField>

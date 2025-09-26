@@ -7,7 +7,7 @@ import type { View, NavigationParams } from '../App';
 import { ArrowLeftIcon, PencilIcon, TrashIcon } from './ui/Icons';
 import { StreamForm } from './StreamForm';
 import { toast } from './ui/Toaster';
-import { saveSubscription, updateCustomer, deleteSubscription, deleteCustomer } from '../lib/data-mutations';
+import { saveSubscription, updateCustomer, deleteSubscription, deleteCustomer, renewSubscription } from '../lib/data-mutations';
 import { TimelineTab } from './TimelineTab';
 import { RewardsTab } from './RewardsTab';
 import { WhatsappComposer } from './WhatsAppComposer';
@@ -77,6 +77,7 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, onBack
     const [customerForm, setCustomerForm] = useState(customer);
     const [activeTab, setActiveTab] = useState<Tab>((params.tab as Tab) || 'streams');
     const [streamToDelete, setStreamToDelete] = useState<Subscription | null>(null);
+    const [streamToRenew, setStreamToRenew] = useState<Subscription | null>(null);
     const [isDeleteCustomerModalOpen, setIsDeleteCustomerModalOpen] = useState(false);
 
     const subscriptions = useLiveQuery(() => db.subscriptions.where('customer_id').equals(customer.id).toArray(), [customer.id]);
@@ -115,6 +116,19 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, onBack
             toast.error("Kon stream niet verwijderen.");
         } finally {
             setStreamToDelete(null);
+        }
+    };
+
+    const handleRenewStream = async () => {
+        if (!streamToRenew || !settings) return;
+        try {
+            await renewSubscription(streamToRenew.id, settings);
+            toast.success(`Stream '${streamToRenew.label}' verlengd!`);
+        } catch (error) {
+            toast.error("Kon stream niet verlengen.");
+            console.error(error);
+        } finally {
+            setStreamToRenew(null);
         }
     };
 
@@ -190,7 +204,7 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, onBack
                     ) : (
                         <div className="space-y-4">
                             {subscriptions?.map(sub => (
-                                <StreamCard key={sub.id} subscription={sub} settings={settings} onEdit={() => setEditingStream(sub)} onDelete={() => setStreamToDelete(sub)} />
+                                <StreamCard key={sub.id} subscription={sub} settings={settings} onEdit={() => setEditingStream(sub)} onDelete={() => setStreamToDelete(sub)} onRenew={() => setStreamToRenew(sub)} />
                             ))}
                             <button onClick={() => setEditingStream({})} className="w-full p-4 border-2 border-dashed rounded-lg text-center hover:bg-gray-50 dark:hover:bg-gray-800/50">
                                 + Nieuwe Stream Toevoegen
@@ -211,6 +225,16 @@ export const CustomerDetail: React.FC<CustomerDetailProps> = ({ customer, onBack
                 onConfirm={handleDeleteStream}
                 title="Stream Verwijderen"
                 message={`Weet je zeker dat je de stream '${streamToDelete?.label}' wilt verwijderen? Deze actie kan hersteld worden vanuit de geschiedenis.`}
+            />
+
+             <ConfirmationModal
+                isOpen={!!streamToRenew}
+                onClose={() => setStreamToRenew(null)}
+                onConfirm={handleRenewStream}
+                title="Stream Verlengen"
+                message={`Weet je zeker dat je de stream '${streamToRenew?.label}' met 1 jaar wilt verlengen? Er wordt automatisch een betaling gelogd.`}
+                confirmText="Ja, Verleng"
+                confirmColor="bg-green-600"
             />
 
             <DeleteCustomerModal 

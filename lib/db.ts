@@ -3,6 +3,12 @@ import Dexie, { Table } from 'dexie';
 // FIX: Corrected import path for types. The path was correct, but the target file was empty.
 import type { Customer, Subscription, AppSettings, WhatsappTemplate, CountryTemplate, TimelineEvent, GiftCode, WhatsappLog, Payment, Country } from '../types';
 
+// Add this interface for the new table
+export interface FileHandleEntry {
+    id: string;
+    handle: any; // Storing FileSystemFileHandle, 'any' for compatibility
+}
+
 export class FLManagerDB extends Dexie {
     customers!: Table<Customer, string>;
     subscriptions!: Table<Subscription, string>;
@@ -14,6 +20,7 @@ export class FLManagerDB extends Dexie {
     whatsappLogs!: Table<WhatsappLog, string>;
     payments!: Table<Payment, string>;
     countries!: Table<Country, string>;
+    fileHandles!: Table<FileHandleEntry, string>; // New table for file handles
 
     constructor() {
         super('FLManagerDB');
@@ -21,9 +28,9 @@ export class FLManagerDB extends Dexie {
         // correctly inferred on the subclass. Casting `this` to `Dexie` explicitly tells
         // the type checker that methods like `version()` are available, resolving the error.
         
-        // FIX: Bumped database version to 9 to add payments and countries tables.
+        // FIX: Bumped database version to 10 to add fileHandles table.
         // FIX: Cast `this` to `Dexie` to fix: Property 'version' does not exist on type 'FLManagerDB'.
-        (this as Dexie).version(9).stores({
+        (this as Dexie).version(10).stores({
             customers: 'id, name, referrer_id, created_at',
             subscriptions: 'id, customer_id, status, end_at, mac',
             settings: 'id',
@@ -34,6 +41,7 @@ export class FLManagerDB extends Dexie {
             whatsappLogs: 'id, customer_id, timestamp',
             payments: 'id, customer_id, subscription_id, payment_date',
             countries: 'code, name',
+            fileHandles: 'id', // Add the new table schema
         });
     }
 }
