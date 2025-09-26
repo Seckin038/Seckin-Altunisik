@@ -21,9 +21,9 @@ const USER_TABLES = [
  * 2. Runs the flm_bootstrap RPC to ensure the DB schema is correct.
  * @returns The initialized and verified Supabase client.
  */
-export const ensureSchema = async (anonKey: string): Promise<SupabaseClient> => {
+export const bootstrapAndHealthCheck = async (anonKey: string): Promise<SupabaseClient> => {
     const supabase = getSupabaseClient();
-    const { REST_URL } = getSupabaseUrls();
+    const { REST_URL, FUNCTIONS_URL } = getSupabaseUrls();
     
     // Health Check 1: REST endpoint (for RPC, auth, etc.)
     const restOk = await fetch(`${REST_URL}/auth/v1/health`, {
@@ -56,7 +56,7 @@ export const fullSync = async () => {
     const settings = await db.settings.get('app');
     if (!settings) throw new Error("Instellingen niet gevonden");
     
-    const supabase = await ensureSchema(settings.supabaseAnonKey);
+    const supabase = await bootstrapAndHealthCheck(settings.supabaseAnonKey);
     
     const CHUNK_SIZE = 50;
 
@@ -115,7 +115,7 @@ export const restoreFromCloud = async () => {
     const settings = await db.settings.get('app');
     if (!settings) throw new Error("Instellingen niet gevonden");
 
-    const supabase = await ensureSchema(settings.supabaseAnonKey);
+    const supabase = await bootstrapAndHealthCheck(settings.supabaseAnonKey);
 
     await db.transaction('rw', db.tables, async () => {
         for (const table of USER_TABLES) {

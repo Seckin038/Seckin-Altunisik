@@ -46,6 +46,7 @@ export interface AppSettings {
     supabaseUrl: string;
     supabaseAnonKey: string;
     last_sync?: number;
+    auto_backup_enabled?: boolean;
 }
 
 export interface WhatsappTemplate {

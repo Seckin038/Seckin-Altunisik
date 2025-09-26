@@ -44,7 +44,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 navState={navState}
                 onNavigate={onNavigate}
             />
-            <main className="pt-20 px-4 pb-20 md:pb-4 md:pl-4">
+            <main 
+                className="px-4 pb-20 md:pb-4 md:pl-4"
+                style={{ paddingTop: 'calc(4rem + env(safe-area-inset-top))' }}
+            >
                 {children}
             </main>
         </div>

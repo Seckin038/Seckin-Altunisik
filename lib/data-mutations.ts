@@ -1,4 +1,3 @@
-
 // FIX: Restored the full content of this file, which was previously empty/corrupted.
 // This file contains all the core functions for writing data to the database.
 
@@ -7,6 +6,7 @@ import type { Customer, Subscription, GiftCode, TimelineEvent, AppSettings, Paym
 import { generateId, computeRenewalDate } from './utils';
 import { logTimelineEvent } from './timeline';
 import { calculateSubscriptionPrice } from './price';
+import { performAutoBackup } from './file-backup';
 
 // CUSTOMER MUTATIONS
 export const addCustomer = async (customerData: Omit<Customer, 'id' | 'created_at' | 'updated_at'>): Promise<Customer> => {
@@ -25,6 +25,7 @@ export const addCustomer = async (customerData: Omit<Customer, 'id' | 'created_a
             meta: { before: true, customer: newCustomer }
         });
     });
+    performAutoBackup();
     return newCustomer;
 };
 
@@ -47,6 +48,7 @@ export const updateCustomer = async (id: string, updates: Partial<Pick<Customer,
             meta: { before: beforeState, after: { ...customer, ...updates } }
         });
     });
+    performAutoBackup();
 };
 
 export const deleteCustomer = async (id: string): Promise<void> => {
@@ -80,6 +82,7 @@ export const deleteCustomer = async (id: string): Promise<void> => {
             },
         });
     });
+    performAutoBackup();
 };
 
 
@@ -139,6 +142,7 @@ export const saveSubscription = async (subData: Partial<Subscription>, giftCodeI
             }
         }
     });
+    performAutoBackup();
     return savedSub!;
 };
 
@@ -156,6 +160,7 @@ export const deleteSubscription = async (id: string): Promise<void> => {
             meta: { before: sub }
         });
     });
+    performAutoBackup();
 };
 
 export const renewSubscription = async (id: string, settings: AppSettings): Promise<void> => {
@@ -192,6 +197,7 @@ export const renewSubscription = async (id: string, settings: AppSettings): Prom
             meta: { before: beforeState, after: { ...sub, end_at: newEndDate, status: 'ACTIVE', paid: true } }
         });
     });
+    performAutoBackup();
 };
 
 // GIFT CODE MUTATIONS
@@ -212,6 +218,7 @@ export const addGiftCode = async (codeData: Omit<GiftCode, 'created_at'>): Promi
         });
     });
     
+    performAutoBackup();
     return newCode;
 };
 
@@ -229,6 +236,7 @@ export const deleteGiftCode = async (id: string): Promise<void> => {
             meta: { before: code }
         });
     });
+    performAutoBackup();
 };
 
 // TIMELINE/REVERT MUTATIONS
@@ -279,4 +287,5 @@ export const revertTimelineEvent = async (eventId: string): Promise<void> => {
             meta: { reverted_event_id: eventId }
         });
     });
+    performAutoBackup();
 };

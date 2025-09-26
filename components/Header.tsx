@@ -11,7 +11,10 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onMenuClick, currentViewTitle, isDarkMode, toggleDarkMode }) => {
     return (
-        <header className="fixed top-0 left-0 right-0 z-20 bg-white dark:bg-gray-800 shadow-md h-16 flex items-center justify-between px-4">
+        <header 
+            className="fixed top-0 left-0 right-0 z-20 bg-white dark:bg-gray-800 shadow-md h-16 flex items-center justify-between px-4"
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
+        >
             <button
                 onClick={onMenuClick}
                 className="p-2 rounded-full text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700"
