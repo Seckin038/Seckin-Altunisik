@@ -15,7 +15,7 @@ interface CustomerListProps {
   onClearFilters: () => void;
 }
 
-type SortKey = 'name' | 'end_at' | 'referrals';
+type SortKey = 'name' | 'status' | 'end_at' | 'referrals';
 type SortOrder = 'asc' | 'desc';
 
 export const CustomerList: React.FC<CustomerListProps> = ({ onSelectCustomer, onAddNewCustomer, filters, onClearFilters }) => {
@@ -109,6 +109,10 @@ export const CustomerList: React.FC<CustomerListProps> = ({ onSelectCustomer, on
                 const comparison = a.customer.name.localeCompare(b.customer.name);
                 return sort.order === 'asc' ? comparison : -comparison;
             }
+            if (sort.key === 'status') {
+                const comparison = a.subscription.status.localeCompare(b.subscription.status);
+                return sort.order === 'asc' ? comparison : -comparison;
+            }
             if (sort.key === 'end_at') {
                 const comparison = a.subscription.end_at - b.subscription.end_at;
                 return sort.order === 'asc' ? comparison : -comparison;
@@ -191,6 +195,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({ onSelectCustomer, on
                     <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs uppercase">
                         <tr>
                             <th className="px-6 py-3 cursor-pointer" onClick={() => handleSortChange('name')}>Klantnaam {sort.key === 'name' && (sort.order === 'asc' ? '▲' : '▼')}</th>
+                            <th className="px-6 py-3 cursor-pointer" onClick={() => handleSortChange('status')}>Status {sort.key === 'status' && (sort.order === 'asc' ? '▲' : '▼')}</th>
                             <th className="px-6 py-3 cursor-pointer" onClick={() => handleSortChange('end_at')}>Einddatum {sort.key === 'end_at' && (sort.order === 'asc' ? '▲' : '▼')}</th>
                             <th className="px-6 py-3">Startdatum</th>
                             <th className="px-6 py-3 cursor-pointer text-center" onClick={() => handleSortChange('referrals')}>Geworven {sort.key === 'referrals' && (sort.order === 'asc' ? '▲' : '▼')}</th>
@@ -199,16 +204,27 @@ export const CustomerList: React.FC<CustomerListProps> = ({ onSelectCustomer, on
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredData?.map(({customer, subscription}) => (
-                            <tr key={subscription.id} onClick={() => onSelectCustomer(customer.id)} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer">
-                                <td className="px-6 py-4 font-medium">{customer.name}</td>
-                                <td className="px-6 py-4 text-sm whitespace-nowrap">{fmtDate(subscription.end_at)}</td>
-                                <td className="px-6 py-4 text-sm whitespace-nowrap">{fmtDate(subscription.start_at)}</td>
-                                <td className="px-6 py-4 text-center font-medium">{referralCounts[customer.id] || 0}</td>
-                                <td className="px-6 py-4 font-mono text-xs">{subscription.mac || 'N/A'}</td>
-                                <td className="px-6 py-4">{subscription.label}</td>
-                            </tr>
-                        ))}
+                        {filteredData?.map(({customer, subscription}) => {
+                            const statusInfo = getStatusInfo(subscription.status);
+                            return (
+                                <tr key={subscription.id} onClick={() => onSelectCustomer(customer.id)} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer">
+                                    <td className="px-6 py-4 font-medium">{customer.name}</td>
+                                    <td className="px-6 py-4">
+                                        <span className={classNames(
+                                            'px-2 py-1 text-xs font-semibold rounded-full text-white whitespace-nowrap',
+                                            statusInfo.color
+                                        )}>
+                                            {statusInfo.text}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm whitespace-nowrap">{fmtDate(subscription.end_at)}</td>
+                                    <td className="px-6 py-4 text-sm whitespace-nowrap">{fmtDate(subscription.start_at)}</td>
+                                    <td className="px-6 py-4 text-center font-medium">{referralCounts[customer.id] || 0}</td>
+                                    <td className="px-6 py-4 font-mono text-xs">{subscription.mac || 'N/A'}</td>
+                                    <td className="px-6 py-4">{subscription.label}</td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                  </table>
                   {(!filteredData || filteredData.length === 0) && (
