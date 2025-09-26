@@ -160,3 +160,43 @@ export const constructM3uUrl = (host: string, username: string, password: string
     const cleanHost = host.replace(/^(https?:\/\/)/, '');
     return `http://${cleanHost}/get.php?username=${username}&password=${password}&type=m3u_plus&output=m3u8`;
 };
+
+
+/**
+ * Retries an async function with exponential backoff.
+ * @param fn The async function to retry.
+ * @param options.tries The number of attempts.
+ * @param options.baseMs The base delay in milliseconds.
+ */
+export async function withRetry<T>(
+    fn: () => Promise<T>, 
+    { tries = 3, baseMs = 500 }: { tries?: number; baseMs?: number } = {}
+): Promise<T> {
+  let attempt = 0;
+  let lastErr: any;
+  while (attempt < tries) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      await new Promise(r => setTimeout(r, baseMs * Math.pow(2, attempt)));
+      attempt++;
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * Normalizes technical errors into user-friendly messages.
+ * @param e The error object.
+ * @returns A user-friendly error string.
+ */
+export function normalizeError(e: unknown): string {
+  const msg = String((e as any)?.message || e);
+  if (/REST onbereikbaar/i.test(msg)) return 'Kon geen verbinding maken met Supabase (REST). Controleer URL/verbinding.';
+  if (/flm_bootstrap failed/.test(msg)) return 'Database-setup mislukte. Probeer opnieuw of controleer je API keys.';
+  if (/sync-push/.test(msg)) return 'Uploaden naar de cloud is mislukt (Functions).';
+  if (/sync-pull/.test(msg)) return 'Downloaden van de cloud is mislukt (Functions).';
+  if (/ongeldig/i.test(msg) || /verwacht/i.test(msg)) return msg; // Pass through validation errors from supabase.ts
+  return 'Er is een onbekende netwerkfout opgetreden.';
+}

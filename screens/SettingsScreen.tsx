@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
 import { toast } from '../components/ui/Toaster';
@@ -8,12 +9,13 @@ import { WhatsappTemplatesSettings } from '../components/WhatsappTemplatesSettin
 import { SyncModal } from '../components/SyncModal';
 import { fullSync, restoreFromCloud } from '../lib/backup';
 import { exportToFile, importFromFile } from '../lib/file-backup'; // New import
-import { formatNL } from '../lib/utils';
+import { formatNL, normalizeError } from '../lib/utils';
 import type { AppSettings } from '../types';
 import { deleteAllUserData, deleteTestCustomers } from '../lib/data-mutations';
 import { MassDeleteModal } from '../components/MassDeleteModal';
 import { RestoreModal } from '../components/RestoreModal';
 import { DeleteTestCustomersModal } from '../components/DeleteTestCustomersModal';
+import { initializeSupabaseClient, getSupabaseUrls } from '../lib/supabase';
 
 const InputField: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string }> = ({ label, ...props }) => (
     <div>
@@ -68,12 +70,15 @@ const SupabaseSetupModal: React.FC<{
                     Configureer je Supabase project om je data veilig te stellen en te synchroniseren.
                  </p>
                  <div className="space-y-4">
-                     <InputField 
-                         label="Supabase URL" 
-                         value={supabaseUrl} 
-                         onChange={(e) => setSupabaseUrl(e.target.value)}
-                         placeholder="https://your-project-ref.supabase.co"
-                     />
+                     <div>
+                         <InputField 
+                             label="Supabase URL" 
+                             value={supabaseUrl} 
+                             onChange={(e) => setSupabaseUrl(e.target.value)}
+                             placeholder="https://your-project-ref.supabase.co"
+                         />
+                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 px-1">Moet eindigen op .supabase.co (niet .functions.supabase.co)</p>
+                    </div>
                      <InputField 
                          label="Supabase Anon Key" 
                          value={supabaseAnonKey} 
@@ -99,10 +104,21 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
     const [isMassDeleteOpen, setIsMassDeleteOpen] = useState(false);
     const [isRestoreOpen, setIsRestoreOpen] = useState(false);
     const [isDeleteTestOpen, setIsDeleteTestOpen] = useState(false);
+    const [derivedUrls, setDerivedUrls] = useState<{ rest: string, functions: string } | null>(null);
     
-    React.useEffect(() => {
+    useEffect(() => {
         if (liveSettings) {
             setSettings(liveSettings);
+            if (liveSettings.supabaseUrl && liveSettings.supabaseAnonKey) {
+                try {
+                    initializeSupabaseClient(liveSettings.supabaseUrl, liveSettings.supabaseAnonKey);
+                    const { REST_URL, FUNCTIONS_URL } = getSupabaseUrls();
+                    setDerivedUrls({ rest: REST_URL, functions: FUNCTIONS_URL });
+                } catch (e: any) {
+                    toast.error(normalizeError(e));
+                    setDerivedUrls(null);
+                }
+            }
         }
     }, [liveSettings]);
 
@@ -114,26 +130,39 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
 
     const handleSave = async (section: string) => {
         try {
-            await db.settings.put({ ...liveSettings, ...settings } as AppSettings);
+            const updatedSettings = { ...liveSettings, ...settings } as AppSettings;
+            await db.settings.put(updatedSettings);
+            
+            if (section === 'API Keys' && updatedSettings.supabaseUrl && updatedSettings.supabaseAnonKey) {
+                 initializeSupabaseClient(updatedSettings.supabaseUrl, updatedSettings.supabaseAnonKey);
+                 const { REST_URL, FUNCTIONS_URL } = getSupabaseUrls();
+                 setDerivedUrls({ rest: REST_URL, functions: FUNCTIONS_URL });
+            }
             toast.success(`${section} opgeslagen!`);
-        } catch (error) {
-            toast.error(`Kon ${section} niet opslaan.`);
+        } catch (error: any) {
+            toast.error(normalizeError(error));
+            setDerivedUrls(null);
             console.error(error);
         }
     };
     
     const handleSaveKeys = async (supabaseUrl: string, supabaseAnonKey: string) => {
         try {
-            await db.settings.put({
+            initializeSupabaseClient(supabaseUrl, supabaseAnonKey);
+            const updatedSettings = {
                 ...liveSettings,
                 ...settings,
                 supabaseUrl,
                 supabaseAnonKey,
-            } as AppSettings);
+            } as AppSettings;
+            await db.settings.put(updatedSettings);
+            const { REST_URL, FUNCTIONS_URL } = getSupabaseUrls();
+            setDerivedUrls({ rest: REST_URL, functions: FUNCTIONS_URL });
             toast.success("Synchronisatie instellingen opgeslagen!");
             setIsSupabaseSetupOpen(false);
-        } catch (error) {
-            toast.error("Kon instellingen niet opslaan.");
+        } catch (error: any) {
+            toast.error(normalizeError(error));
+            setDerivedUrls(null);
             console.error(error);
         }
     }
@@ -166,7 +195,8 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
             toast.success("Herstel voltooid! De app wordt opnieuw geladen.", { id: toastId, duration: 5000 });
             setTimeout(() => window.location.reload(), 2000);
         } catch (error: any) {
-            toast.error(`Herstel mislukt. ${error.message}`, { id: toastId, duration: 5000 });
+            const errorMessage = normalizeError(error);
+            toast.error(`Herstel mislukt. ${errorMessage}`, { id: toastId, duration: 5000 });
             console.error(error);
         } finally {
             setIsRestoreOpen(false);
@@ -316,11 +346,20 @@ export const SettingsScreen: React.FC<{ settings: AppSettings }> = ({ settings: 
                             <p className="text-sm text-gray-500 dark:text-gray-400">Laatst gesynchroniseerd: {settings.last_sync ? formatNL(settings.last_sync) : 'Nooit'}</p>
                              <button onClick={() => setIsSyncModalOpen(true)} className="bg-purple-600 text-white px-4 py-2 rounded-lg">Synchroniseer</button>
                         </div>
-                        <InputField label="Supabase URL" name="supabaseUrl" value={settings.supabaseUrl || ''} onChange={handleChange} />
+                        <div>
+                            <InputField label="Supabase URL" name="supabaseUrl" value={settings.supabaseUrl || ''} onChange={handleChange} />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 px-1">Moet eindigen op .supabase.co</p>
+                        </div>
                         <InputField label="Supabase Anon Key" name="supabaseAnonKey" value={settings.supabaseAnonKey || ''} onChange={handleChange} />
                          <div className="flex justify-end mt-2">
                             <button onClick={() => handleSave('API Keys')} className="bg-brand-600 text-white px-4 py-2 rounded-lg">API Keys Opslaan</button>
                         </div>
+                        {derivedUrls && (
+                            <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-xs space-y-1">
+                                <p><strong>Gevalideerde REST URL:</strong> {derivedUrls.rest}</p>
+                                <p><strong>Afgeleide Functions URL:</strong> {derivedUrls.functions}</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

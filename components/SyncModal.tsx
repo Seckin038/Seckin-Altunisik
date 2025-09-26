@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { toast } from './ui/Toaster';
 // FIX: Corrected icon import.
 import { RefreshIcon } from './ui/Icons';
+import { normalizeError } from '../lib/utils';
 
 interface SyncModalProps {
     isOpen: boolean;
@@ -22,7 +23,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({ isOpen, onClose, onSync })
             toast.success('Synchronisatie voltooid!', { id: toastId, duration: 5000 });
             onClose();
         } catch (err: any) {
-            const errorMessage = err.message || 'Er is een onbekende fout opgetreden.';
+            const errorMessage = normalizeError(err);
             setError(errorMessage);
             toast.error(`Synchronisatie mislukt: ${errorMessage}`, { id: toastId, duration: 5000 });
         } finally {
@@ -48,7 +49,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({ isOpen, onClose, onSync })
                 </p>
 
                 {error && (
-                    <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+                    <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 dark:bg-red-900/50 dark:text-red-200 dark:border-red-600" role="alert">
                         <p className="font-bold">Fout</p>
                         <p>{error}</p>
                     </div>

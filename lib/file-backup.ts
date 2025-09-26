@@ -68,7 +68,7 @@ export const exportToFile = async (): Promise<void> => {
 
     const exportData: { [key: string]: any[] } = {};
     for (const tableName of USER_TABLES) {
-        exportData[tableName] = await db[tableName].toArray();
+        exportData[tableName] = await db.table(tableName).toArray();
     }
     
     const writable = await fileHandle.createWritable();
@@ -103,11 +103,14 @@ export const importFromFile = async (): Promise<void> => {
         throw new Error("Ongeldig back-up bestandsformaat.");
     }
 
-    await db.transaction('rw', ...USER_TABLES, async () => {
+    await db.transaction('rw', ...USER_TABLES.map(t => db.table(t)), async () => {
         for (const tableName of USER_TABLES) {
             if (data[tableName]) {
-                await db[tableName].clear();
-                await db[tableName].bulkPut(data[tableName]);
+                await db.table(tableName).clear();
+                // FIX: The switch statement with explicit table properties was causing a TypeScript
+                // overload resolution error ("Expected 0-1 arguments, but got 2").
+                // Using db.table(tableName) is a more dynamic approach that avoids this issue.
+                await db.table(tableName).bulkPut(data[tableName]);
             }
         }
     });

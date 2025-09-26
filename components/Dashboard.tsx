@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
+import type { Subscription } from '../types';
 // FIX: Import XCircleIcon to resolve reference error.
 import { UserGroupIcon, ClockIcon, CurrencyEuroIcon, FireIcon, XCircleIcon } from './ui/Icons';
 import type { View, NavigationParams } from '../App';
@@ -33,7 +34,8 @@ const StatCard: React.FC<{
 );
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-    const [isBulkModalOpen, setIsBulkModalOpen] = React.useState(false);
+    const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+    const [subsForBulkWhatsapp, setSubsForBulkWhatsapp] = useState<Subscription[]>([]);
     
     const stats = useLiveQuery(() => {
         const now = Date.now();
@@ -58,21 +60,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         });
     }, []);
 
-    const handleBulkWhatsappClick = async () => {
+    const handleOpenBulkWhatsapp = async () => {
         const now = Date.now();
         const fourteenDaysFromNow = now + (14 * 24 * 60 * 60 * 1000);
-        const expiringSubs = await db.subscriptions.where('end_at').between(now, fourteenDaysFromNow).and(sub => sub.status === 'ACTIVE').toArray();
-        if (expiringSubs.length > 0) {
-             // A bit of a hack, but we need to pass the subs to the modal somehow.
-             // We can't store them in state easily because of the async nature of the click handler.
-             // So we'll just open the modal with the data directly.
-             // This is a temporary solution until we refactor the dashboard stats logic.
-             // For now, let's just make the component re-render with the modal open.
-             // The modal itself will then fetch the data again. This is inefficient but works.
-             // A better solution is to pass the subscriptions as a prop to a conditionally rendered modal.
-             // Let's implement that.
-             // The component will be re-rendered anyway when state changes.
-        }
+        const expiring = await db.subscriptions.where('end_at').between(now, fourteenDaysFromNow).and(sub => sub.status === 'ACTIVE').toArray();
+        setSubsForBulkWhatsapp(expiring);
+        setIsBulkModalOpen(true);
     };
 
 
@@ -111,10 +104,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </div>
             
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                <h2 className="text-xl font-semibold mb-4">Snelle Acties</h2>
+                <button
+                    onClick={handleOpenBulkWhatsapp}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg disabled:bg-green-400 dark:disabled:bg-green-800 disabled:cursor-not-allowed"
+                    disabled={!stats || stats.expiringSoonCount === 0}
+                >
+                    Stuur WhatsApp Herinneringen ({stats?.expiringSoonCount ?? 0})
+                </button>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
                  <FinancialCharts />
             </div>
 
-            {/* The BulkWhatsappModal is no longer triggered from here directly */}
+            {isBulkModalOpen && (
+                <BulkWhatsappModal 
+                    subscriptions={subsForBulkWhatsapp}
+                    onClose={() => setIsBulkModalOpen(false)}
+                />
+            )}
         </div>
     );
 };

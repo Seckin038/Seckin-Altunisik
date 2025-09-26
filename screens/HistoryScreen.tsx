@@ -165,7 +165,7 @@ export const HistoryScreen: React.FC<{ onNavigate: (view: View, params?: Navigat
                                         <button 
                                             onClick={() => handleRevertClick(event)}
                                             disabled={isReverted}
-                                            className="text-sm font-medium text-brand-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="text-xs px-2 py-1 rounded bg-yellow-400 text-yellow-900 hover:bg-yellow-500 disabled:bg-gray-400 disabled:text-gray-700 disabled:cursor-not-allowed dark:disabled:bg-gray-600 dark:disabled:text-gray-300"
                                         >
                                             {isReverted ? 'Hersteld' : 'Herstel'}
                                         </button>

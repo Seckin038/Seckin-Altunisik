@@ -42,12 +42,15 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
                 </p>
                 
                 <div className="space-y-4">
-                    <InputField 
-                        label="Supabase URL" 
-                        value={supabaseUrl} 
-                        onChange={(e) => setSupabaseUrl(e.target.value)}
-                        placeholder="https://your-project-ref.supabase.co"
-                    />
+                    <div>
+                        <InputField 
+                            label="Supabase URL" 
+                            value={supabaseUrl} 
+                            onChange={(e) => setSupabaseUrl(e.target.value)}
+                            placeholder="https://your-project-ref.supabase.co"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 px-1">Moet eindigen op .supabase.co (niet .functions.supabase.co)</p>
+                    </div>
                     <InputField 
                         label="Supabase Anon Key" 
                         value={supabaseAnonKey} 
